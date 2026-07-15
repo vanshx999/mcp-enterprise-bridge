@@ -1,0 +1,60 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "mcp-bridge.fullname" . }}-config
+  namespace: mcp-bridge
+  labels: {{ include "mcp-bridge.labels" . | nindent 4 }}
+data:
+  ENVIRONMENT: {{ .Values.config.environment | quote }}
+  DATABASE_URL: {{ .Values.config.databaseUrl | replace "${dbPassword}" .Values.secrets.dbPassword | quote }}
+  REDIS_URL: {{ .Values.config.redisUrl | quote }}
+  ALLOWED_ORIGINS: {{ .Values.config.allowedOrigins | quote }}
+  ACCESS_TOKEN_EXPIRE_MINUTES: {{ .Values.config.accessTokenExpireMinutes | quote }}
+  APPROVAL_TIMEOUT_MINUTES: {{ .Values.config.approvalTimeoutMinutes | quote }}
+  AUDIT_LOG_RETENTION_DAYS: {{ .Values.config.auditLogRetentionDays | quote }}
+  JWT_SECRET_KEY_FILE: /etc/secrets/jwt-secret
+  GROQ_API_KEY_FILE: /etc/secrets/groq-api-key
+  SENTRY_DSN: {{ .Values.config.sentryDsn | quote }}
+  SLACK_WEBHOOK_URL: {{ .Values.config.slackWebhookUrl | quote }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "mcp-bridge.fullname" . }}-caddy
+  namespace: mcp-bridge
+  labels: {{ include "mcp-bridge.labels" . | nindent 4 }}
+data:
+  Caddyfile: |
+    {
+        admin off
+    }
+    {{ .Values.global.domain }} {
+        reverse_proxy /api/* backend:8000
+        reverse_proxy /ws/* backend:8000
+        reverse_proxy frontend:5173
+    }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "mcp-bridge.fullname" . }}-pgbouncer
+  namespace: mcp-bridge
+  labels: {{ include "mcp-bridge.labels" . | nindent 4 }}
+data:
+  pgbouncer.ini: |
+    [databases]
+    mcp_bridge = host=postgres port=5432 dbname=mcp_bridge
+
+    [pgbouncer]
+    listen_addr = 0.0.0.0
+    listen_port = 6432
+    auth_type = scram-sha-256
+    auth_file = /etc/pgbouncer/userlist.txt
+    pool_mode = transaction
+    default_pool_size = 50
+    max_client_conn = 200
+    server_idle_timeout = 600
+    query_timeout = 30
+
+  userlist.txt: |
+    "postgres" "{{ .Values.secrets.dbPassword }}"

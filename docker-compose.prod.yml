@@ -1,0 +1,190 @@
+services:
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+    restart: always
+    deploy:
+      resources:
+        limits: { memory: 128M }
+        reservations: { memory: 64M }
+    healthcheck:
+      test: ["CMD", "caddy", "version"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    expose:
+      - "8000"
+    env_file: ./backend/.env
+    environment:
+      - ENVIRONMENT=production
+      - DATABASE_URL=postgresql://postgres:postgres@pgbouncer:6432/mcp_bridge
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET_KEY_FILE=/run/secrets/jwt_secret
+      - GROQ_API_KEY_FILE=/run/secrets/groq_api_key
+    secrets:
+      - jwt_secret
+      - groq_api_key
+    depends_on:
+      postgres:
+        condition: service_healthy
+      pgbouncer:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    restart: always
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --workers 4 --proxy-headers --forwarded-allow-ips="*"
+    deploy:
+      resources:
+        limits: { cpus: "1.0", memory: 512M }
+        reservations: { cpus: "0.5", memory: 256M }
+    healthcheck:
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8000/api/health').raise_for_status()"]
+      interval: 15s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    expose:
+      - "5173"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: always
+    deploy:
+      resources:
+        limits: { memory: 128M }
+        reservations: { memory: 64M }
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:5173"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    platform: linux/arm64/v8
+    expose:
+      - "6432"
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - DB_NAME=mcp_bridge
+      - LISTEN_PORT=6432
+      - AUTH_TYPE=scram-sha-256
+      - POOL_MODE=transaction
+      - DEFAULT_POOL_SIZE=50
+      - MAX_CLIENT_CONN=200
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: always
+    deploy:
+      resources:
+        limits: { cpus: "0.5", memory: 256M }
+        reservations: { cpus: "0.25", memory: 128M }
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h localhost -p 6432 -U postgres"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  postgres:
+    image: postgres:16-alpine
+    expose:
+      - "5432"
+    environment:
+      POSTGRES_DB: mcp_bridge
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: always
+    deploy:
+      resources:
+        limits: { cpus: "1.0", memory: 1G }
+        reservations: { cpus: "0.5", memory: 512M }
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d mcp_bridge"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  redis:
+    image: redis:7-alpine
+    expose:
+      - "6379"
+    restart: always
+    deploy:
+      resources:
+        limits: { memory: 256M }
+        reservations: { memory: 128M }
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+secrets:
+  jwt_secret:
+    file: ./secrets/jwt_secret.txt
+  groq_api_key:
+    file: ./secrets/groq_api_key.txt
+
+volumes:
+  caddy_data:
+  caddy_config:
+  pgdata:

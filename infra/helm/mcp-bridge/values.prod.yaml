@@ -1,0 +1,36 @@
+replicaCount: 3
+
+global:
+  environment: production
+  domain: mcp-bridge.example.com
+
+config:
+  environment: production
+  allowedOrigins: "https://mcp-bridge.example.com"
+  sentryDsn: "https://key@sentry.io/project"
+  slackWebhookUrl: "https://hooks.slack.com/services/xxx/yyy/zzz"
+
+ingress:
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  tls:
+    - hosts:
+        - mcp-bridge.example.com
+      secretName: mcp-bridge-tls
+
+resources:
+  backend:
+    requests:
+      cpu: 512m
+      memory: 1Gi
+    limits:
+      cpu: 2000m
+      memory: 2Gi
+
+autoscaling:
+  backend:
+    minReplicas: 3
+    maxReplicas: 20
+
+serviceMonitor:
+  enabled: true

@@ -1,0 +1,14 @@
+apiVersion: v2
+name: mcp-bridge
+description: MCP Enterprise Bridge - secure LLM-to-database middleware with HITL approval
+type: application
+version: 0.1.0
+appVersion: "latest"
+keywords:
+  - mcp
+  - llm
+  - database
+  - hitl
+  - approval
+maintainers:
+  - name: MCP Bridge Team

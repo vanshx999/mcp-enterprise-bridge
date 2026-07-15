@@ -1,0 +1,17 @@
+{
+    admin off
+}
+
+localhost {
+    tls internal
+    reverse_proxy /api/* backend:8000
+    reverse_proxy /ws/* backend:8000
+    reverse_proxy frontend:5173
+}
+
+# Production: uncomment, replace domain, remove tls internal
+# example.com {
+#     reverse_proxy /api/* backend:8000
+#     reverse_proxy /ws/* backend:8000
+#     reverse_proxy frontend:5173
+# }

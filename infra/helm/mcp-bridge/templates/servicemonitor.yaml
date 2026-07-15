@@ -1,0 +1,23 @@
+{{- if .Values.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "mcp-bridge.fullname" . }}-backend
+  namespace: mcp-bridge
+  labels:
+    {{ include "mcp-bridge.labels" . | nindent 4 }}
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      {{ include "mcp-bridge.selectorLabels" . | nindent 4 }}
+      app.kubernetes.io/component: backend
+  endpoints:
+    - port: http
+      path: /api/metrics
+      interval: {{ .Values.serviceMonitor.interval }}
+      scrapeTimeout: {{ .Values.serviceMonitor.scrapeTimeout }}
+  namespaceSelector:
+    matchNames:
+      - mcp-bridge
+{{- end }}

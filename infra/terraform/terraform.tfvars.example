@@ -1,0 +1,15 @@
+aws_region  = "us-east-1"
+environment = "production"
+
+domain_name     = "mcp-bridge.example.com"
+certificate_arn = "arn:aws:acm:us-east-1:123456789012:certificate/xxxx-xxxx-xxxx-xxxx"
+
+db_username = "mcpbridge"
+db_password = "your-strong-db-password"
+
+jwt_secret   = "your-256-bit-jwt-secret"
+groq_api_key = "gsk_your_groq_key_here"
+
+# Optional
+sentry_dsn         = "https://key@sentry.io/project"
+slack_webhook_url  = "https://hooks.slack.com/services/xxx/yyy/zzz"

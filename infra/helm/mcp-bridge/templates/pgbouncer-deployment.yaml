@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "mcp-bridge.fullname" . }}-pgbouncer
+  namespace: mcp-bridge
+  labels:
+    {{ include "mcp-bridge.labels" . | nindent 4 }}
+    app.kubernetes.io/component: pgbouncer
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      {{ include "mcp-bridge.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: pgbouncer
+  template:
+    metadata:
+      labels:
+        {{ include "mcp-bridge.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: pgbouncer
+    spec:
+      {{ include "mcp-bridge.imagePullSecrets" . | nindent 6 }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 70
+        fsGroup: 70
+      containers:
+        - name: pgbouncer
+          image: "{{ .Values.image.pgbouncer.repository }}:{{ .Values.image.pgbouncer.tag }}"
+          imagePullPolicy: {{ .Values.image.pgbouncer.pullPolicy }}
+          ports:
+            - containerPort: 6432
+              name: pgbouncer
+              protocol: TCP
+          volumeMounts:
+            - name: config
+              mountPath: /etc/pgbouncer
+              readOnly: true
+          resources: {{ toYaml .Values.resources.pgbouncer | nindent 12 }}
+          livenessProbe:
+            tcpSocket:
+              port: pgbouncer
+            initialDelaySeconds: 15
+            periodSeconds: 15
+          readinessProbe:
+            tcpSocket:
+              port: pgbouncer
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "mcp-bridge.fullname" . }}-pgbouncer

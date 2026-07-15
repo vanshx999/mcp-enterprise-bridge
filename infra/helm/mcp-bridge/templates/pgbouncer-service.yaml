@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: pgbouncer
+  namespace: mcp-bridge
+  labels:
+    {{ include "mcp-bridge.labels" . | nindent 4 }}
+    app.kubernetes.io/component: pgbouncer
+spec:
+  type: ClusterIP
+  selector:
+    {{ include "mcp-bridge.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: pgbouncer
+  ports:
+    - name: pgbouncer
+      port: 6432
+      targetPort: pgbouncer
+      protocol: TCP

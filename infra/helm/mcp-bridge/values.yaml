@@ -1,0 +1,115 @@
+replicaCount: 2
+
+global:
+  environment: production
+  domain: ""
+  imagePullSecrets: []
+
+image:
+  backend:
+    repository: ghcr.io/your-org/mcp-enterprise-bridge-backend
+    tag: latest
+    pullPolicy: Always
+  frontend:
+    repository: ghcr.io/your-org/mcp-enterprise-bridge-frontend
+    tag: latest
+    pullPolicy: Always
+  caddy:
+    repository: caddy
+    tag: 2-alpine
+    pullPolicy: IfNotPresent
+  pgbouncer:
+    repository: edoburu/pgbouncer
+    tag: latest
+    pullPolicy: IfNotPresent
+
+secrets:
+  jwtSecret: ""
+  groqApiKey: ""
+  dbPassword: ""
+
+config:
+  environment: production
+  databaseUrl: "postgresql://postgres:${dbPassword}@postgres:5432/mcp_bridge"
+  redisUrl: "redis://redis:6379"
+  allowedOrigins: ""
+  accessTokenExpireMinutes: 30
+  approvalTimeoutMinutes: 10
+  auditLogRetentionDays: 90
+  sentryDsn: ""
+  slackWebhookUrl: ""
+
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  tls:
+    - hosts: []
+      secretName: mcp-bridge-tls
+
+resources:
+  backend:
+    requests:
+      cpu: 256m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1024Mi
+  frontend:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 256m
+      memory: 256Mi
+  caddy:
+    requests:
+      cpu: 100m
+      memory: 64Mi
+    limits:
+      cpu: 256m
+      memory: 128Mi
+  pgbouncer:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+  postgres:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  redis:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 256m
+      memory: 256Mi
+
+autoscaling:
+  backend:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+
+postgresql:
+  persistence:
+    size: 20Gi
+    storageClass: ""
+
+serviceMonitor:
+  enabled: false
+  interval: 30s
+  scrapeTimeout: 10s
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
