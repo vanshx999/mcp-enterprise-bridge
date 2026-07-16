@@ -19,8 +19,8 @@ def _parse_db_url(url: str) -> dict:
     return {k: v for k, v in dict(user=user, password=password, host=host, port=port, database=db).items() if v is not None}
 
 
-SUPABASE_POOLER_HOST = "aws-0-us-east-2.pooler.supabase.com"
-SUPABASE_POOLER_PORT = 6543
+SUPABASE_POOLER_HOST = "aws-0-ap-northeast-1.pooler.supabase.com"
+SUPABASE_POOLER_PORT = 5432
 
 
 async def _resolve_ipv4(host: str) -> str | None:
