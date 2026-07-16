@@ -4,6 +4,9 @@ set -e
 echo "Python version: $(python --version)"
 echo "PORT: ${PORT:-8000}"
 
+# Try adding Render's internal DNS resolver
+echo "nameserver 10.128.0.2" >> /etc/resolv.conf 2>/dev/null || true
+
 python3 << 'PYEOF'
 import os, socket, re
 
@@ -16,8 +19,9 @@ if url:
         host = m.group(1)
         port = int(m.group(2)) if m.group(2) else 5432
         print(f"  host: {host}, port: {port}")
+        print(f"  resolv.conf: {open('/etc/resolv.conf').read()}")
         tried = [host]
-        for suffix in ['.oregon.postgres.render.com', '.ohio.postgres.render.com', '.postgres.render.com']:
+        for suffix in ['.oregon.postgres.render.com', '.ohio.postgres.render.com', '.frankfurt.postgres.render.com', '.postgres.render.com']:
             tried.append(host + suffix)
         for h in tried:
             try:
