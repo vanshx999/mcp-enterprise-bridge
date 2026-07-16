@@ -1,7 +1,4 @@
 import asyncio
-import socket
-import re
-import urllib.parse
 import asyncpg
 from core.config import settings
 from core.logging import logger
@@ -9,64 +6,12 @@ from core.logging import logger
 pool: asyncpg.Pool | None = None
 
 
-def _parse_db_url(url: str) -> dict:
-    parsed = urllib.parse.urlparse(url)
-    user = parsed.username
-    password = parsed.password
-    host = parsed.hostname or "localhost"
-    port = parsed.port or 5432
-    db = parsed.path.lstrip("/") or "postgres"
-    return {k: v for k, v in dict(user=user, password=password, host=host, port=port, database=db).items() if v is not None}
-
-
-SUPABASE_POOLER_HOST = "aws-0-ap-northeast-1.pooler.supabase.com"
-SUPABASE_POOLER_PORT = 5432
-
-
-async def _resolve_ipv4(host: str) -> str | None:
-    def _resolve(h: str) -> str | None:
-        try:
-            ips = socket.getaddrinfo(h, 5432, socket.AF_INET)
-            return ips[0][4][0]
-        except Exception:
-            return None
-    return await asyncio.to_thread(_resolve, host)
-
-
-def _extract_supabase_project_ref(host: str) -> str | None:
-    m = re.match(r"db\.([^.]+)\.supabase\.co", host)
-    return m.group(1) if m else None
-
-
 async def get_pool() -> asyncpg.Pool:
     global pool
     if pool is None:
         url = settings.database_url
-        ssl = None
-        if settings.render or "sslmode=require" in url:
-            url = url.replace("?sslmode=require", "").replace("&sslmode=require", "")
-            ssl = "require"
-        conn_kwargs = _parse_db_url(url)
-        original_host = conn_kwargs["host"]
-        resolved = await _resolve_ipv4(original_host)
-        if resolved:
-            conn_kwargs["host"] = resolved
-            logger.info(f"Resolved {original_host} to IPv4: {resolved}")
-        else:
-            project_ref = _extract_supabase_project_ref(original_host)
-            if project_ref:
-                conn_kwargs["host"] = SUPABASE_POOLER_HOST
-                conn_kwargs["port"] = SUPABASE_POOLER_PORT
-                if conn_kwargs.get("user") and "." not in conn_kwargs["user"]:
-                    conn_kwargs["user"] = f"{conn_kwargs['user']}.{project_ref}"
-                conn_kwargs.setdefault("ssl", "require")
-                logger.info(f"IPv4 not found for Supabase — using pooler {SUPABASE_POOLER_HOST}:{SUPABASE_POOLER_PORT} as {conn_kwargs['user']}")
-            else:
-                logger.info(f"No IPv4 for {original_host} — using hostname directly")
-        if ssl:
-            conn_kwargs["ssl"] = ssl
-        logger.info(f"Connecting to DB at {conn_kwargs['host']}:{conn_kwargs['port']}/{conn_kwargs['database']} as {conn_kwargs.get('user')}")
-        pool = await asyncpg.create_pool(min_size=2, max_size=10, **conn_kwargs)
+        logger.info(f"Connecting to database")
+        pool = await asyncpg.create_pool(url, min_size=2, max_size=10, ssl="require")
     return pool
 
 
