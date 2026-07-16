@@ -4,9 +4,6 @@ set -e
 echo "Python version: $(python --version)"
 echo "PORT: ${PORT:-8000}"
 
-# Try adding Render's internal DNS resolver
-echo "nameserver 10.128.0.2" >> /etc/resolv.conf 2>/dev/null || true
-
 python3 << 'PYEOF'
 import os, socket, re
 

@@ -8,34 +8,21 @@ from core.logging import logger
 pool: asyncpg.Pool | None = None
 
 
-RENDER_DNS_SUFFIXES = [
-    ".oregon.postgres.render.com",
-    ".ohio.postgres.render.com",
-    ".frankfurt.postgres.render.com",
-    ".singapore.postgres.render.com",
-    ".postgres.render.com",
-]
-
-
 async def _resolve_db_host(url: str) -> str:
     m = re.match(r".*@([^:/]+)", url)
     if not m:
         return url
     host = m.group(1)
-    def _try_resolve(h: str) -> bool:
+    def _resolve_v4(h: str) -> str | None:
         try:
-            socket.getaddrinfo(h, 5432)
-            return True
+            ips = socket.getaddrinfo(h, 5432, socket.AF_INET)
+            return ips[0][4][0]
         except Exception:
-            return False
-    if await asyncio.to_thread(_try_resolve, host):
-        return url
-    for suffix in RENDER_DNS_SUFFIXES:
-        fqdn = host + suffix
-        if await asyncio.to_thread(_try_resolve, fqdn):
-            logger.info(f"Resolved DB host via: {fqdn}")
-            return url.replace("@" + host, "@" + fqdn)
-    logger.warning(f"Could not resolve DB host: {host}")
+            return None
+    ip = await asyncio.to_thread(_resolve_v4, host)
+    if ip:
+        return url.replace("@" + host, "@" + ip)
+    logger.warning(f"Could not resolve DB host (IPv4): {host}")
     return url
 
 
