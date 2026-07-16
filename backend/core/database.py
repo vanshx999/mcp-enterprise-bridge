@@ -24,6 +24,8 @@ async def _resolve_db_host(url: str) -> str:
     ip = await asyncio.to_thread(_resolve_first, host)
     if ip:
         logger.info(f"Resolved DB host to IP: {ip}")
+        if ":" in ip:
+            ip = f"[{ip}]"
         return url.replace("@" + host, "@" + ip)
     logger.warning(f"Could not resolve DB host: {host}")
     return url
