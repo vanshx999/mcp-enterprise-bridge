@@ -8,6 +8,7 @@ services:
     dockerContext: ./backend
     healthCheckPath: /api/health
     envVars:
+      # DATABASE_URL: set manually in Render dashboard (Supabase/Neon free tier)
       - key: JWT_SECRET_KEY
         generateValue: true
       - key: GROQ_API_KEY
@@ -35,8 +36,6 @@ services:
       - key: VITE_API_URL
         value: https://mcp-bridge-backend.onrender.com
 
-databases:
-  - name: mcp-bridge-db
-    plan: free
-    databaseName: mcp_bridge
-    ipAllowList: []
+# Database: Use Supabase free tier (https://supabase.com)
+# After signing up, create a project and copy the connection string
+# Set it as DATABASE_URL env var in the backend service settings
