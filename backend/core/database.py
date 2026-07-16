@@ -13,16 +13,19 @@ async def _resolve_db_host(url: str) -> str:
     if not m:
         return url
     host = m.group(1)
-    def _resolve_v4(h: str) -> str | None:
-        try:
-            ips = socket.getaddrinfo(h, 5432, socket.AF_INET)
-            return ips[0][4][0]
-        except Exception:
-            return None
-    ip = await asyncio.to_thread(_resolve_v4, host)
+    def _resolve_first(h: str) -> str | None:
+        for family in (socket.AF_INET, socket.AF_INET6):
+            try:
+                ips = socket.getaddrinfo(h, 5432, family)
+                return ips[0][4][0]
+            except Exception:
+                continue
+        return None
+    ip = await asyncio.to_thread(_resolve_first, host)
     if ip:
+        logger.info(f"Resolved DB host to IP: {ip}")
         return url.replace("@" + host, "@" + ip)
-    logger.warning(f"Could not resolve DB host (IPv4): {host}")
+    logger.warning(f"Could not resolve DB host: {host}")
     return url
 
 
