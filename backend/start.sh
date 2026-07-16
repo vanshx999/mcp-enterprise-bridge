@@ -3,18 +3,34 @@ set -e
 
 echo "Python version: $(python --version)"
 echo "PORT: ${PORT:-8000}"
-if [ -n "$DATABASE_URL" ]; then
-  DB_HOST=$(echo "$DATABASE_URL" | sed -n 's/.*@\([^:/]*\).*/\1/p')
-  echo "DB host extracted: $DB_HOST"
-  echo "Full URL scheme+host: $(echo "$DATABASE_URL" | sed 's/[^:@]*@/***@/')"
-  python3 -c "
-import socket
-try:
-    addr = socket.getaddrinfo('$DB_HOST', 5432)
-    print(f'DNS resolves to: {addr[0][4]}')
-except Exception as e:
-    print(f'DNS resolution failed: {e}')
-"
-fi
+
+python3 << 'PYEOF'
+import os, socket, re
+
+url = os.environ.get("DATABASE_URL", "")
+if url:
+    masked = re.sub(r':([^@]+)@', ':***@', url)
+    print(f"DATABASE_URL: {masked}")
+    m = re.match(r'.*@([^:/]+)(?::(\d+))?[/?]', url)
+    if m:
+        host = m.group(1)
+        port = int(m.group(2)) if m.group(2) else 5432
+        print(f"  host: {host}, port: {port}")
+        tried = [host]
+        for suffix in ['.oregon.postgres.render.com', '.ohio.postgres.render.com', '.postgres.render.com']:
+            tried.append(host + suffix)
+        for h in tried:
+            try:
+                ips = socket.getaddrinfo(h, port)
+                print(f"  DNS OK: {h} -> {ips[0][4]}")
+                break
+            except Exception:
+                if h == tried[-1]:
+                    print(f"  DNS FAILED: all tried")
+    else:
+        print(f"  Could not parse hostname from URL")
+else:
+    print("DATABASE_URL: not set")
+PYEOF
 
 exec uvicorn main:app --host 0.0.0.0 --port "${PORT:-8000}" --proxy-headers --forwarded-allow-ips=*

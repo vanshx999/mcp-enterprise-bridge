@@ -1,8 +1,42 @@
 import asyncio
+import socket
+import re
 import asyncpg
 from core.config import settings
+from core.logging import logger
 
 pool: asyncpg.Pool | None = None
+
+
+RENDER_DNS_SUFFIXES = [
+    ".oregon.postgres.render.com",
+    ".ohio.postgres.render.com",
+    ".frankfurt.postgres.render.com",
+    ".singapore.postgres.render.com",
+    ".postgres.render.com",
+]
+
+
+async def _resolve_db_host(url: str) -> str:
+    m = re.match(r".*@([^:/]+)", url)
+    if not m:
+        return url
+    host = m.group(1)
+    def _try_resolve(h: str) -> bool:
+        try:
+            socket.getaddrinfo(h, 5432)
+            return True
+        except Exception:
+            return False
+    if await asyncio.to_thread(_try_resolve, host):
+        return url
+    for suffix in RENDER_DNS_SUFFIXES:
+        fqdn = host + suffix
+        if await asyncio.to_thread(_try_resolve, fqdn):
+            logger.info(f"Resolved DB host via: {fqdn}")
+            return url.replace("@" + host, "@" + fqdn)
+    logger.warning(f"Could not resolve DB host: {host}")
+    return url
 
 
 async def get_pool() -> asyncpg.Pool:
@@ -13,6 +47,7 @@ async def get_pool() -> asyncpg.Pool:
         if settings.render or "sslmode=require" in url:
             url = url.replace("?sslmode=require", "").replace("&sslmode=require", "")
             ssl = "require"
+        url = await _resolve_db_host(url)
         pool = await asyncpg.create_pool(
             url, min_size=2, max_size=10, ssl=ssl
         )

@@ -1,17 +1,13 @@
 services:
   - type: web
     name: mcp-bridge-backend
-    env: python
+    env: docker
     region: ohio
     plan: free
-    buildCommand: python --version && pip install -r backend/requirements.txt
-    startCommand: cd backend && python debug_db.py && exec uvicorn main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips=*
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
     healthCheckPath: /api/health
     envVars:
-      - key: DATABASE_URL
-        fromDatabase:
-          name: mcp-bridge-db
-          property: externalConnectionString
       - key: JWT_SECRET_KEY
         generateValue: true
       - key: GROQ_API_KEY
