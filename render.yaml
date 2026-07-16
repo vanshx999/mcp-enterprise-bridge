@@ -1,11 +1,11 @@
 services:
   - type: web
     name: mcp-bridge-backend
-    env: docker
+    env: python
     region: ohio
     plan: free
-    dockerfilePath: ./backend/Dockerfile
-    dockerContext: ./backend
+    buildCommand: python --version && pip install -r backend/requirements.txt
+    startCommand: cd backend && python debug_db.py && exec uvicorn main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips=*
     healthCheckPath: /api/health
     envVars:
       - key: DATABASE_URL
