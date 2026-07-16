@@ -1,6 +1,7 @@
 import asyncio
 import socket
 import re
+import urllib.parse
 import asyncpg
 from core.config import settings
 from core.logging import logger
@@ -8,11 +9,17 @@ from core.logging import logger
 pool: asyncpg.Pool | None = None
 
 
-async def _resolve_db_host(url: str) -> str:
-    m = re.match(r".*@([^:/]+)", url)
-    if not m:
-        return url
-    host = m.group(1)
+def _parse_db_url(url: str) -> dict:
+    parsed = urllib.parse.urlparse(url)
+    user = parsed.username
+    password = parsed.password
+    host = parsed.hostname or "localhost"
+    port = parsed.port or 5432
+    db = parsed.path.lstrip("/") or "postgres"
+    return {k: v for k, v in dict(user=user, password=password, host=host, port=port, database=db).items() if v is not None}
+
+
+async def _resolve_db_host(host: str) -> str:
     def _resolve_first(h: str) -> str | None:
         for family in (socket.AF_INET, socket.AF_INET6):
             try:
@@ -23,12 +30,10 @@ async def _resolve_db_host(url: str) -> str:
         return None
     ip = await asyncio.to_thread(_resolve_first, host)
     if ip:
-        logger.info(f"Resolved DB host to IP: {ip}")
-        if ":" in ip:
-            ip = f"[{ip}]"
-        return url.replace("@" + host, "@" + ip)
+        logger.info(f"Resolved DB host {host} to IP: {ip}")
+        return ip
     logger.warning(f"Could not resolve DB host: {host}")
-    return url
+    return host
 
 
 async def get_pool() -> asyncpg.Pool:
@@ -39,10 +44,13 @@ async def get_pool() -> asyncpg.Pool:
         if settings.render or "sslmode=require" in url:
             url = url.replace("?sslmode=require", "").replace("&sslmode=require", "")
             ssl = "require"
-        url = await _resolve_db_host(url)
-        pool = await asyncpg.create_pool(
-            url, min_size=2, max_size=10, ssl=ssl
-        )
+        conn_kwargs = _parse_db_url(url)
+        resolved_host = await _resolve_db_host(conn_kwargs["host"])
+        conn_kwargs["host"] = resolved_host
+        if ssl:
+            conn_kwargs["ssl"] = ssl
+        logger.info(f"Connecting to DB at {resolved_host}:{conn_kwargs['port']}/{conn_kwargs['database']}")
+        pool = await asyncpg.create_pool(min_size=2, max_size=10, **conn_kwargs)
     return pool
 
 
