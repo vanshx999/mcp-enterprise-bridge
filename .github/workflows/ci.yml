@@ -13,6 +13,20 @@ env:
 jobs:
   backend-test:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     defaults:
       run:
         working-directory: backend
@@ -33,6 +47,8 @@ jobs:
 
       - name: Run backend tests
         run: python -m pytest -v
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/test
 
   frontend-lint:
     runs-on: ubuntu-latest
