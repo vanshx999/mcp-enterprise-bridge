@@ -1,3 +1,4 @@
+import asyncio
 import asyncpg
 from core.config import settings
 
@@ -27,6 +28,16 @@ async def close_pool():
 
 async def init_db():
     p = await get_pool()
+    for attempt in range(5):
+        try:
+            async with p.acquire() as conn:
+                await conn.fetchval("SELECT 1")
+            break
+        except Exception:
+            if attempt < 4:
+                await asyncio.sleep(2 ** attempt)
+            else:
+                raise
     async with p.acquire() as conn:
         await conn.execute(
             """
